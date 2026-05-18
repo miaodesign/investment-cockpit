@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>投资驾驶舱</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+            background: #f5f7fa;
+            color: #333;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ffd93d;
+            animation: pulse 2s infinite;
+        }
+        .status-dot.connected { background: #6bcb77; animation: none; }
+        .status-dot.error { background: #ff6b6b; animation: none; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        .container { padding: 16px; max-width: 600px; margin: 0 auto; }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card-title {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .metric {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .metric-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+        .metric-value { font-size: 20px; font-weight: 700; }
+        .metric-value.up { color: #e74c3c; }
+        .metric-value.down { color: #27ae60; }
+        
+        .holding-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .holding-item:last-child { border-bottom: none; }
+        .holding-name { font-weight: 600; font-size: 14px; }
+        .holding-code { font-size: 11px; color: #999; margin-top: 2px; }
+        .holding-pnl { text-align: right; }
+        .holding-pnl-value { font-weight: 700; font-size: 14px; }
+        .holding-pnl-value.up { color: #e74c3c; }
+        .holding-pnl-value.down { color: #27ae60; }
+        .holding-pnl-pct { font-size: 11px; color: #999; margin-top: 2px; }
+        
+        .decision-item {
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 3px solid #667eea;
+        }
+        .decision-item:last-child { margin-bottom: 0; }
+        .decision-priority { font-size: 10px; color: #999; margin-bottom: 4px; }
+        .decision-action { font-weight: 600; font-size: 14px; }
+        .decision-reason { font-size: 12px; color: #666; margin-top: 4px; }
+        
+        .env-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #eef;
+            color: #667eea;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn:hover { background: #5a6fd6; }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .loading::after {
+            content: '';
+            display: block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #667eea;
+            border-top-color: transparent;
+            border-radius: 50%;
+            margin: 20px auto 0;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .error-box {
+            background: #fee;
+            color: #c33;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 16px;
+        }
+        
+        #lastUpdate {
+            text-align: center;
+            color: #999;
+            font-size: 11px;
+            margin-top: 16px;
+            padding-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>投资驾驶舱</h1>
+        <div class="status-bar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">连接中...</span>
+        </div>
+    </div>
+
+    <div id="loading" class="loading">加载数据中</div>
+    <div id="error" class="error-box" style="display:none;"></div>
+    
+    <div id="content" style="display:none;">
+        <div class="container">
+            <!-- 资产概览 -->
+            <div class="card">
+                <div class="card-title">资产概览</div>
+                <div class="metric-grid">
+                    <div class="metric">
+                        <div class="metric-label">总资产</div>
+                        <div class="metric-value" id="totalAssets">--</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">总盈亏</div>
+                        <div class="metric-value" id="totalPnl">--</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">今日盈亏</div>
+                        <div class="metric-value" id="todayPnl">--</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">仓位</div>
+                        <div class="metric-value" id="position">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 持仓明细 -->
+            <div class="card">
+                <div class="card-title">持仓明细</div>
+                <div id="holdings"></div>
+            </div>
+
+            <!-- 决策建议 -->
+            <div class="card">
+                <div class="card-title">决策建议 <span class="env-badge" id="envBadge">--</span></div>
+                <div id="decisions"></div>
+            </div>
+
+            <!-- 操作 -->
+            <div class="card">
+                <button class="btn" id="refreshBtn">刷新数据</button>
+            </div>
+
+            <div id="lastUpdate"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        
+        const fmt = (n) => n ? n.toLocaleString('zh-CN') : '--';
+        const fmtPct = (n) => n ? ((n >= 0 ? '+' : '') + n.toFixed(2) + '%') : '--';
+
+        function setStatus(type, text) {
+            document.getElementById('statusDot').className = 'status-dot ' + type;
+            document.getElementById('statusText').textContent = text;
+        }
+
+        async function loadData() {
+            const loading = document.getElementById('loading');
+            const content = document.getElementById('content');
+            const error = document.getElementById('error');
+            
+            loading.style.display = 'block';
+            content.style.display = 'none';
+            error.style.display = 'none';
+            setStatus('', '加载中...');
+
+            try {
+                const [portfolioRes, decisionRes] = await Promise.all([
+                    fetch(API_BASE + '/portfolio').catch(() => ({ success: false })),
+                    fetch(API_BASE + '/decision-engine').catch(() => ({ success: false }))
+                ]).then(responses => Promise.all(responses.map(r => r.json())));
+
+                if (!portfolioRes.success) throw new Error('Portfolio加载失败');
+
+                renderPortfolio(portfolioRes.data);
+                renderDecision(decisionRes.data);
+                
+                setStatus('connected', '已连接');
+                loading.style.display = 'none';
+                content.style.display = 'block';
+                document.getElementById('lastUpdate').textContent = '更新于 ' + new Date().toLocaleTimeString();
+            } catch (e) {
+                console.error('加载失败:', e);
+                setStatus('error', '连接失败');
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.innerHTML = '加载失败<br><br><button class="btn" onclick="loadData()">重试</button>';
+            }
+        }
+
+        function renderPortfolio(data) {
+            const t = data.totals || {};
+            
+            document.getElementById('totalAssets').textContent = '¥' + fmt(t.total_assets);
+            
+            const pnlEl = document.getElementById('totalPnl');
+            pnlEl.textContent = (t.total_pnl >= 0 ? '+' : '') + '¥' + fmt(t.total_pnl);
+            pnlEl.className = 'metric-value ' + (t.total_pnl >= 0 ? 'up' : 'down');
+            
+            const todayEl = document.getElementById('todayPnl');
+            todayEl.textContent = (t.today_pnl >= 0 ? '+' : '') + '¥' + fmt(t.today_pnl);
+            todayEl.className = 'metric-value ' + (t.today_pnl >= 0 ? 'up' : 'down');
+            
+            document.getElementById('position').textContent = (t.position_pct || '--') + '%';
+
+            let html = '';
+            (data.accounts || []).forEach(acc => {
+                (acc.stocks || []).forEach(s => {
+                    html += `<div class="holding-item">
+                        <div>
+                            <div class="holding-name">${s.name || s.Name || '--'}</div>
+                            <div class="holding-code">${acc.label} · ${s.code} · ${s.qty}股</div>
+                        </div>
+                        <div class="holding-pnl">
+                            <div class="holding-pnl-value ${s.pnl >= 0 ? 'up' : 'down'}">${s.pnl >= 0 ? '+' : ''}¥${fmt(s.pnl)}</div>
+                            <div class="holding-pnl-pct">${fmtPct(s.pnlPct)} · ¥${fmt(s.price, 2)}</div>
+                        </div>
+                    </div>`;
+                });
+            });
+            document.getElementById('holdings').innerHTML = html || '<div style="color:#999;text-align:center;padding:20px;">暂无持仓</div>';
+        }
+
+        function renderDecision(data) {
+            if (!data) return;
+            const env = data.market_env || {};
+            document.getElementById('envBadge').textContent = env.level || '--';
+            
+            let html = '';
+            (data.suggestions || []).slice(0, 5).forEach(s => {
+                html += `<div class="decision-item">
+                    <div class="decision-priority">优先级: ${s.priority}</div>
+                    <div class="decision-action">${s.action}</div>
+                    <div class="decision-reason">${s.reason}</div>
+                </div>`;
+            });
+            document.getElementById('decisions').innerHTML = html || '<div style="color:#999;">暂无建议</div>';
+        }
+
+        document.getElementById('refreshBtn').addEventListener('click', loadData);
+        loadData();
+        setInterval(loadData, 60000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "builds": [
+    {"src": "api/**/*.py", "use": "@vercel/python"}
+  ],
+  "routes": [
+    {"src": "/api/portfolio", "dest": "api/portfolio.py"},
+    {"src": "/api/decision-engine", "dest": "api/decision-engine.py"},
+    {"src": "/api/health", "dest": "api/health.py"},
+    {"src": "/api/(.*)", "dest": "api/index.py"},
+    {"src": "/(.*)", "dest": "/index.html"}
+  ]
+}
